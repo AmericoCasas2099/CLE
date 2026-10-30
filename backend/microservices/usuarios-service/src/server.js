@@ -1,9 +1,4 @@
 require("dotenv").config();
-
 const app = require("./app");
-
-const PORT = process.env.PORT || 3001;
-
-app.listen(PORT, () => {
-    console.log(`Usuarios Service ejecutándose en http://localhost:${PORT}`);
-});
+const PORT = Number(process.env.PORT || 3001);
+app.listen(PORT, () => console.log(`usuarios-service: http://localhost:${PORT}`));

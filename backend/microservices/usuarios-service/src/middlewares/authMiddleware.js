@@ -1,62 +1,49 @@
 const { verificarToken } = require("../utils/jwt");
+const repo = require("../repositories/usuarioRepository");
+const { formatearUsuario } = require("../services/authService");
 
-function authMiddleware(req, res, next) {
-    const authorization = req.headers.authorization;
-
-    if (!authorization) {
+async function authMiddleware(req, res, next) {
+    const header = req.headers.authorization || "";
+    const partes = header.split(" ");
+    if (partes.length !== 2 || partes[0] !== "Bearer" || !partes[1]) {
         return res.status(401).json({
-            error: {
-                codigo: "TOKEN_REQUERIDO",
-                mensaje: "Se requiere un token de autenticación"
-            }
+            error: { codigo: "TOKEN_REQUERIDO", mensaje: "Envía Authorization: Bearer <token>" }
         });
     }
 
-    const partes = authorization.split(" ");
-
-    if (
-        partes.length !== 2 ||
-        partes[0] !== "Bearer" ||
-        !partes[1]
-    ) {
-        return res.status(401).json({
-            error: {
-                codigo: "FORMATO_TOKEN_INVALIDO",
-                mensaje: "El token debe enviarse como Bearer <token>"
-            }
-        });
-    }
-
+    let payload;
     try {
-        const decoded = verificarToken(partes[1]);
-
-        req.auth = {
-            usuario_id: decoded.sub,
-            rol: decoded.rol
-        };
-
-        next();
-
+        payload = verificarToken(partes[1]);
     } catch (error) {
         if (error.name === "TokenExpiredError") {
             return res.status(401).json({
-                error: {
-                    codigo: "TOKEN_EXPIRADO",
-                    mensaje: "La sesión ha expirado"
-                }
+                error: { codigo: "TOKEN_EXPIRADO", mensaje: "La sesión ha expirado" }
             });
         }
-
-        if (error.name === "JsonWebTokenError" ||
-            error.name === "NotBeforeError") {
+        if (error.name === "JsonWebTokenError" || error.name === "NotBeforeError") {
             return res.status(401).json({
-                error: {
-                    codigo: "TOKEN_INVALIDO",
-                    mensaje: "Token de autenticación inválido"
-                }
+                error: { codigo: "TOKEN_INVALIDO", mensaje: "Token inválido" }
             });
         }
+        return next(error);
+    }
 
+    try {
+        const usuario = await repo.buscarPorId(payload.sub);
+        if (!usuario) {
+            return res.status(401).json({
+                error: { codigo: "USUARIO_NO_ENCONTRADO", mensaje: "La cuenta no existe" }
+            });
+        }
+        if (usuario.estatus !== "Activo") {
+            return res.status(403).json({
+                error: { codigo: "USUARIO_INACTIVO", mensaje: "La cuenta está inactiva" }
+            });
+        }
+        req.auth = { usuario_id: usuario.usuario_id, rol: usuario.rol };
+        req.usuario = formatearUsuario(usuario);
+        next();
+    } catch (error) {
         next(error);
     }
 }

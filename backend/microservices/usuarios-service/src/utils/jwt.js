@@ -3,16 +3,17 @@ const jwt = require("jsonwebtoken");
 const ISSUER = "cle-usuarios-service";
 const AUDIENCE = "cle-api";
 
-function generarToken(usuario) {
-    if (!process.env.JWT_SECRET) {
-        throw new Error("JWT_SECRET no está configurado");
+function obtenerSecreto() {
+    if (!process.env.JWT_SECRET || Buffer.byteLength(process.env.JWT_SECRET) < 32) {
+        throw new Error("Configura JWT_SECRET con al menos 32 bytes aleatorios");
     }
+    return process.env.JWT_SECRET;
+}
 
+function generarToken(usuario) {
     return jwt.sign(
-        {
-            rol: usuario.rol
-        },
-        process.env.JWT_SECRET,
+        { rol: usuario.rol },
+        obtenerSecreto(),
         {
             subject: String(usuario.usuario_id),
             expiresIn: process.env.JWT_EXPIRES_IN || "1h",
@@ -24,22 +25,11 @@ function generarToken(usuario) {
 }
 
 function verificarToken(token) {
-    if (!process.env.JWT_SECRET) {
-        throw new Error("JWT_SECRET no está configurado");
-    }
-
-    return jwt.verify(
-        token,
-        process.env.JWT_SECRET,
-        {
-            algorithms: ["HS256"],
-            issuer: ISSUER,
-            audience: AUDIENCE
-        }
-    );
+    return jwt.verify(token, obtenerSecreto(), {
+        algorithms: ["HS256"],
+        issuer: ISSUER,
+        audience: AUDIENCE
+    });
 }
 
-module.exports = {
-    generarToken,
-    verificarToken
-};
+module.exports = { generarToken, verificarToken };

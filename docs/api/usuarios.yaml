@@ -1,12 +1,12 @@
 openapi: 3.0.3
 info:
   title: CLE - API de Usuarios y Autenticación
-  version: 1.0.0
+  version: 1.0.1
   description: |
     Contrato  para usuarios-service del Centro de Lenguas Extranjeras.
     Solo los administradores crean cuentas. Se inicia sesión únicamente mediante
     identificador de acceso (no por correo electrónico). Roles: Administrador, Maestro, Alumno.
-    Estatus: activo, inactivo. 
+    Estatus: Activo, Inactivo. No hay cambio obligatorio de contraseña.
 
 servers:
   - url: http://localhost:3001/api/v1
@@ -27,7 +27,7 @@ paths:
       summary: Iniciar sesión
       description: |
         Acepta únicamente el identificador_acceso y la contraseña. El correo no permite iniciar sesión.
-        Solo permite el acceso cuando el estatus es activo. No indica si la cuenta
+        Solo permite el acceso cuando el estatus es Activo. No indica si la cuenta
         existe al devolver credenciales incorrectas.
       security: []
       operationId: iniciarSesion
@@ -171,12 +171,10 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/InternalError' }
-    put:
+    patch:
       tags: [Usuarios]
-      summary: Modificar identificador, correo o rol de un usuario
-      description: |
-        Solo Administrador. No modifica la contraseña ni el estatus.
-        Al cambiar roles se debe impedir dejar al sistema sin administradores activos.
+      summary: Modificar el correo de un usuario
+      description: Solo Administrador. El identificador, rol, contraseña y estatus no cambian.
       operationId: actualizarUsuario
       x-roles-permitidos: [Administrador]
       requestBody:
@@ -190,6 +188,37 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Usuario' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /usuarios/{usuarioId}/rol:
+    parameters:
+      - $ref: '#/components/parameters/UsuarioId'
+    patch:
+      tags: [Usuarios]
+      summary: Cambiar el rol de un usuario
+      description: Solo Administrador. No se puede quitar el rol al último administrador activo.
+      operationId: cambiarRolUsuario
+      x-roles-permitidos: [Administrador]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CambiarRolRequest' }
+      responses:
+        '200':
+          description: Rol actualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [usuario]
+                properties:
+                  usuario: { $ref: '#/components/schemas/Usuario' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -282,7 +311,7 @@ components:
       enum: [Administrador, Maestro, Alumno]
     EstatusNombre:
       type: string
-      enum: [activo, inactivo]
+      enum: [Activo, Inactivo]
     Rol:
       type: object
       required: [rol_id, nombre]
@@ -337,12 +366,16 @@ components:
     ActualizarUsuarioRequest:
       type: object
       additionalProperties: false
-      required: [identificador_acceso, correo, rol_id]
-      description: PUT reemplaza los campos editables; correo puede ser null.
+      required: [correo]
+      description: PATCH modifica únicamente el correo; se permite null para quitarlo.
       properties:
-        identificador_acceso: { type: string, minLength: 1, maxLength: 30 }
         correo: { type: string, format: email, maxLength: 150, nullable: true }
-        rol_id: { type: integer, minimum: 1 }
+    CambiarRolRequest:
+      type: object
+      additionalProperties: false
+      required: [rol_id]
+      properties:
+        rol_id: { type: integer, minimum: 1, description: ID de un rol existente }
     CambiarEstatusRequest:
       type: object
       additionalProperties: false
