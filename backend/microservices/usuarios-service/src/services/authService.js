@@ -23,9 +23,9 @@ function formatearUsuario(usuario) {
     };
 }
 
-async function login(identificador, password) {
-    const usuario = await usuarioRepository.buscarPorIdentificador(identificador);
-    // Respuesta genérica para usuario inexistente o contraseña equivocada.
+async function login(correo, password) {
+    const usuario = await usuarioRepository.buscarPorCorreo(correo);
+    // Respuesta para usuario inexistente o contraseña equivocada.
     if (!usuario || !(await bcrypt.compare(password, usuario.password_hash))) {
         throw new AuthError("CREDENCIALES_INVALIDAS", "Identificador o contraseña incorrectos");
     }
@@ -121,4 +121,71 @@ async function cambiarPassword(usuarioId, passwordActual, passwordNueva) {
     }
 }
 
-module.exports = { login, formatearUsuario, cambiarPassword, AuthError };
+
+async function actualizarCorreoPropio(usuarioId, correo, password) {
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const usuario = await usuarioRepository.obtenerUsuarioParaCambioCorreo(
+            client,
+            usuarioId
+        );
+
+        if (!usuario || usuario.estatus !== "Activo") {
+            const error = new Error("USUARIO_NO_DISPONIBLE");
+            error.status = 403;
+            throw error;
+        }
+
+        const passwordValida = await bcrypt.compare(
+            password,
+            usuario.password_hash
+        );
+
+        if (!passwordValida) {
+            const error = new Error("CREDENCIALES_INVALIDAS");
+            error.status = 401;
+            throw error;
+        }
+
+        const correoNormalizado = correo.trim().toLowerCase();
+
+        if (usuario.correo === correoNormalizado) {
+            const error = new Error("CORREO_SIN_CAMBIOS");
+            error.status = 400;
+            throw error;
+        }
+
+        const actualizado = await usuarioRepository.actualizarCorreoUsuario(
+            client,
+            usuarioId,
+            correoNormalizado
+        );
+
+        await client.query("COMMIT");
+
+        return {
+            mensaje: "Correo actualizado correctamente",
+            usuario: actualizado
+        };
+
+    } catch (error) {
+        await client.query("ROLLBACK");
+
+        if (error.code === "23505") {
+            const conflicto = new Error("CORREO_DUPLICADO");
+            conflicto.status = 409;
+            throw conflicto;
+        }
+
+        throw error;
+
+    } finally {
+        client.release();
+    }
+}
+
+
+module.exports = { login, formatearUsuario, cambiarPassword, actualizarCorreoPropio, AuthError };

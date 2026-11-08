@@ -1,81 +1,129 @@
 openapi: 3.0.3
 info:
-  title: CLE - API de Usuarios y Autenticación
-  version: 1.0.1
-  description: |
-    Contrato  para usuarios-service del Centro de Lenguas Extranjeras.
-    Solo los administradores crean cuentas. Se inicia sesión únicamente mediante
-    identificador de acceso (no por correo electrónico). Roles: Administrador, Maestro, Alumno.
-    Estatus: Activo, Inactivo. No hay cambio obligatorio de contraseña.
+  title: CLE - Microservicio de Usuarios
+  version: 1.3.0
+  description: 'Contrato OpenAPI del microservicio de usuarios del CLE.
 
+    Inicio de sesión con correo y contraseña. La creación de cuentas es exclusiva 
+    del Administrador. No incluye autorregistro ni verificación de correo.
+
+    '
 servers:
-  - url: http://localhost:3001/api/v1
-    description: Desarrollo local (acceso directo al microservicio)
-
+- url: https://aircraft-sept-maker-mug.trycloudflare.com
+  description: /health responde desde gateway Nginx
+- url: http://localhost:3001
+  description: Desarrollo local (acceso directo al microservicio)
 tags:
-  - name: Autenticación
-  - name: Usuarios
-  - name: Catálogos
-
+- name: Autenticación
+- name: Usuarios
+- name: Catálogos
 security:
-  - bearerAuth: []
-
+- bearerAuth: []
 paths:
-  /auth/login:
-    post:
-      tags: [Autenticación]
-      summary: Iniciar sesión
-      description: |
-        Acepta únicamente el identificador_acceso y la contraseña. El correo no permite iniciar sesión.
-        Solo permite el acceso cuando el estatus es Activo. No indica si la cuenta
-        existe al devolver credenciales incorrectas.
+  /health:
+    get:
+      tags:
+      - Autenticación
+      summary: Estado básico del microservicio
       security: []
-      operationId: iniciarSesion
+      responses:
+        '200':
+          description: Servicio disponible
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  servicio:
+                    type: string
+                    example: usuarios-service
+                  estado:
+                    type: string
+                    example: ok
+  /api/v1/auth/login:
+    post:
+      tags:
+      - Autenticación
+      summary: Iniciar sesión con correo electrónico
+      security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/LoginRequest'
-            examples:
-              conIdentificador:
-                summary: Inicio de sesión con ID de acceso
-                value: { identificador_acceso: '2023123456', password: 'EjemploSegura123!' }
       responses:
         '200':
-          description: Inicio de sesión exitoso
+          description: Credenciales válidas. Devuelve un JWT.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '429': { $ref: '#/components/responses/TooManyRequests' }
-        '500': { $ref: '#/components/responses/InternalError' }
-
-  /auth/perfil:
-    get:
-      tags: [Autenticación]
-      summary: Consultar perfil de la cuenta autenticada
-      operationId: obtenerPerfil
-      responses:
-        '200':
-          description: Perfil recuperado
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Cuenta inactiva u otro bloqueo aplicable
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Usuario'
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '500': { $ref: '#/components/responses/InternalError' }
-
-  /auth/cambiar-password:
+                $ref: '#/components/schemas/Error'
+  /api/v1/auth/perfil:
+    get:
+      tags:
+      - Autenticación
+      summary: Consultar perfil del usuario autenticado
+      responses:
+        '200':
+          description: Información del perfil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usuario:
+                    $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags:
+      - Autenticación
+      summary: Modificar el correo electrónico propio
+      description: Cualquier usuario autenticado y activo puede cambiar su propio correo, confirmando su contraseña
+        actual. El ID se obtiene del JWT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarCorreoPropioRequest'
+      responses:
+        '200':
+          description: Correo actualizado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActualizarCorreoPropioResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/auth/cambiar-password:
     put:
-      tags: [Autenticación]
-      summary: Cambiar voluntariamente la contraseña propia
-      operationId: cambiarPassword
-      description: Exige contraseña actual; no hay cambio obligatorio durante el primer inicio de sesión.
+      tags:
+      - Autenticación
+      summary: Cambiar la propia contraseña
       requestBody:
         required: true
         content:
@@ -83,19 +131,18 @@ paths:
             schema:
               $ref: '#/components/schemas/CambiarPasswordRequest'
       responses:
-        '204': { description: Contraseña actualizada; sin cuerpo }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '500': { $ref: '#/components/responses/InternalError' }
-
-  /usuarios:
+        '204':
+          description: Contraseña actualizada sin contenido de respuesta
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/usuarios:
     post:
-      tags: [Usuarios]
-      summary: Crear una cuenta
-      description: Solo Administrador. El backend genera el hash y la fecha de creación.
-      operationId: crearUsuario
-      x-roles-permitidos: [Administrador]
+      tags:
+      - Usuarios
+      summary: Crear un usuario (solo Administrador)
+      description: El Administrador selecciona rol_id; el correo se requiere para acceso por correo.
       requestBody:
         required: true
         content:
@@ -105,193 +152,205 @@ paths:
       responses:
         '201':
           description: Usuario creado
-          headers:
-            Location:
-              description: Ruta del usuario creado
-              schema: { type: string, example: '/api/v1/usuarios/15' }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Usuario' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalError' }
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
     get:
-      tags: [Usuarios]
-      summary: Listar usuarios
-      operationId: listarUsuarios
-      x-roles-permitidos: [Administrador]
+      tags:
+      - Usuarios
+      summary: Listar usuarios paginados (solo Administrador)
       parameters:
-        - in: query
-          name: pagina
-          schema: { type: integer, minimum: 1, default: 1 }
-        - in: query
-          name: limite
-          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
-        - in: query
-          name: rol
-          description: Filtrar por el nombre del rol
-          schema: { $ref: '#/components/schemas/RolNombre' }
-        - in: query
-          name: estatus
-          description: Filtrar por estatus
-          schema: { $ref: '#/components/schemas/EstatusNombre' }
-        - in: query
-          name: busqueda
-          description: Búsqueda por identificador de acceso o correo
-          schema: { type: string, maxLength: 150 }
+      - in: query
+        name: pagina
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: limite
+        schema:
+          type: integer
+          minimum: 1
+          default: 10
       responses:
         '200':
           description: Lista paginada
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/UsuariosPaginados' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '500': { $ref: '#/components/responses/InternalError' }
-
-  /usuarios/{usuarioId}:
+              schema:
+                $ref: '#/components/schemas/ListaUsuarios'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/usuarios/{usuarioId}:
     parameters:
-      - $ref: '#/components/parameters/UsuarioId'
+    - $ref: '#/components/parameters/UsuarioId'
     get:
-      tags: [Usuarios]
-      summary: Consultar un usuario por ID
-      operationId: obtenerUsuario
-      x-roles-permitidos: [Administrador]
+      tags:
+      - Usuarios
+      summary: Consultar usuario por ID (solo Administrador)
       responses:
         '200':
-          description: Usuario recuperado
+          description: Usuario encontrado
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Usuario' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalError' }
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     patch:
-      tags: [Usuarios]
-      summary: Modificar el correo de un usuario
-      description: Solo Administrador. El identificador, rol, contraseña y estatus no cambian.
-      operationId: actualizarUsuario
-      x-roles-permitidos: [Administrador]
+      tags:
+      - Usuarios
+      summary: Modificar correo de un usuario (solo Administrador)
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ActualizarUsuarioRequest' }
+            schema:
+              $ref: '#/components/schemas/ActualizarCorreoRequest'
       responses:
         '200':
-          description: Usuario actualizado
+          description: Usuario modificado
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Usuario' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalError' }
-
-  /usuarios/{usuarioId}/rol:
-    parameters:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/usuarios/{usuarioId}/rol:
+    patch:
+      tags:
+      - Usuarios
+      summary: Cambiar rol de un usuario (solo Administrador)
+      description: No se permite degradar al último Administrador activo.
+      parameters:
       - $ref: '#/components/parameters/UsuarioId'
-    patch:
-      tags: [Usuarios]
-      summary: Cambiar el rol de un usuario
-      description: Solo Administrador. No se puede quitar el rol al último administrador activo.
-      operationId: cambiarRolUsuario
-      x-roles-permitidos: [Administrador]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CambiarRolRequest' }
+            schema:
+              type: object
+              required:
+              - rol_id
+              properties:
+                rol_id:
+                  type: integer
+                  minimum: 1
+              additionalProperties: false
       responses:
         '200':
           description: Rol actualizado
           content:
             application/json:
               schema:
-                type: object
-                required: [usuario]
-                properties:
-                  usuario: { $ref: '#/components/schemas/Usuario' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalError' }
-
-  /usuarios/{usuarioId}/estatus:
-    parameters:
-      - $ref: '#/components/parameters/UsuarioId'
+                $ref: '#/components/schemas/Usuario'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/usuarios/{usuarioId}/estatus:
     patch:
-      tags: [Usuarios]
-      summary: Activar o inactivar una cuenta
-      description: |
-        Solo Administrador. No se puede inactivar al último administrador activo.
-        Los tokens de usuarios inactivos deben rechazarse en endpoints protegidos,
-        incluso cuando hayan sido emitidos anteriormente.
-      operationId: cambiarEstatusUsuario
-      x-roles-permitidos: [Administrador]
+      tags:
+      - Usuarios
+      summary: Activar o inactivar usuario (solo Administrador)
+      description: No se permite inactivar al último Administrador activo.
+      parameters:
+      - $ref: '#/components/parameters/UsuarioId'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CambiarEstatusRequest' }
+            schema:
+              type: object
+              required:
+              - estatus_id
+              properties:
+                estatus_id:
+                  type: integer
+                  minimum: 1
+              additionalProperties: false
       responses:
         '200':
           description: Estatus actualizado
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Usuario' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalError' }
-
-  /roles:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/roles:
     get:
-      tags: [Catálogos]
-      summary: Consultar roles disponibles
-      operationId: listarRoles
-      x-roles-permitidos: [Administrador]
+      tags:
+      - Catálogos
+      summary: Consultar roles (solo Administrador)
       responses:
         '200':
-          description: Roles recuperados
+          description: Catálogo de roles
           content:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/Rol' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '500': { $ref: '#/components/responses/InternalError' }
-
-  /estatus-usuarios:
+                items:
+                  $ref: '#/components/schemas/Rol'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/estatus-usuarios:
     get:
-      tags: [Catálogos]
-      summary: Consultar estatus disponibles
-      operationId: listarEstatus
-      x-roles-permitidos: [Administrador]
+      tags:
+      - Catálogos
+      summary: Consultar estatus de usuario (solo Administrador)
       responses:
         '200':
-          description: Estatus recuperados
+          description: Catálogo de estatus
           content:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/Estatus' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '500': { $ref: '#/components/responses/InternalError' }
-
+                items:
+                  $ref: '#/components/schemas/Estatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 components:
   securitySchemes:
     bearerAuth:
@@ -300,153 +359,215 @@ components:
       bearerFormat: JWT
   parameters:
     UsuarioId:
-      in: path
       name: usuarioId
+      in: path
       required: true
-      description: ID numérico del usuario
-      schema: { type: integer, minimum: 1 }
-  schemas:
-    RolNombre:
-      type: string
-      enum: [Administrador, Maestro, Alumno]
-    EstatusNombre:
-      type: string
-      enum: [Activo, Inactivo]
-    Rol:
-      type: object
-      required: [rol_id, nombre]
-      properties:
-        rol_id: { type: integer, example: 1, description: 'ID ilustrativo; confirmar con datos reales de BD' }
-        nombre: { $ref: '#/components/schemas/RolNombre' }
-    Estatus:
-      type: object
-      required: [estatus_id, nombre]
-      properties:
-        estatus_id: { type: integer, example: 1, description: 'ID ilustrativo; confirmar con datos reales de BD' }
-        nombre: { $ref: '#/components/schemas/EstatusNombre' }
-    Usuario:
-      type: object
-      description: Nunca incluye password_hash ni contraseña.
-      required: [usuario_id, identificador_acceso, correo, rol, estatus, fecha_creacion]
-      properties:
-        usuario_id: { type: integer, example: 15 }
-        identificador_acceso: { type: string, maxLength: 30, example: '2023123456' }
-        correo: { type: string, format: email, nullable: true, maxLength: 150, example: 'alumno@ejemplo.com' }
-        rol: { $ref: '#/components/schemas/Rol' }
-        estatus: { $ref: '#/components/schemas/Estatus' }
-        fecha_creacion: { type: string, format: date-time, example: '2026-10-29T12:00:00Z' }
-    LoginRequest:
-      type: object
-      additionalProperties: false
-      required: [identificador_acceso, password]
-      properties:
-        identificador_acceso:
-          type: string
-          minLength: 1
-          maxLength: 30
-          description: ID de acceso asignado al usuario; no se admite correo electrónico
-        password: { type: string, minLength: 1, format: password }
-    LoginResponse:
-      type: object
-      required: [token, token_type, expires_in, usuario]
-      properties:
-        token: { type: string, description: JWT firmado }
-        token_type: { type: string, enum: [Bearer] }
-        expires_in: { type: integer, description: Segundos hasta la expiración, example: 3600 }
-        usuario: { $ref: '#/components/schemas/Usuario' }
-    CrearUsuarioRequest:
-      type: object
-      additionalProperties: false
-      required: [identificador_acceso, password, rol_id]
-      properties:
-        identificador_acceso: { type: string, minLength: 1, maxLength: 30 }
-        correo: { type: string, format: email, maxLength: 150, nullable: true, description: Opcional; único si se proporciona (pendiente de confirmar en SQL) }
-        password: { type: string, format: password, minLength: 8, description: Política sugerida; validar con el equipo }
-        rol_id: { type: integer, minimum: 1, description: ID existente en catálogo rol, no asumir IDs }
-    ActualizarUsuarioRequest:
-      type: object
-      additionalProperties: false
-      required: [correo]
-      description: PATCH modifica únicamente el correo; se permite null para quitarlo.
-      properties:
-        correo: { type: string, format: email, maxLength: 150, nullable: true }
-    CambiarRolRequest:
-      type: object
-      additionalProperties: false
-      required: [rol_id]
-      properties:
-        rol_id: { type: integer, minimum: 1, description: ID de un rol existente }
-    CambiarEstatusRequest:
-      type: object
-      additionalProperties: false
-      required: [estatus]
-      properties:
-        estatus: { $ref: '#/components/schemas/EstatusNombre' }
-    CambiarPasswordRequest:
-      type: object
-      additionalProperties: false
-      required: [password_actual, password_nueva]
-      properties:
-        password_actual: { type: string, format: password, minLength: 1 }
-        password_nueva: { type: string, format: password, minLength: 8, description: Política sugerida; validar con el equipo }
-    UsuariosPaginados:
-      type: object
-      required: [datos, paginacion]
-      properties:
-        datos:
-          type: array
-          items: { $ref: '#/components/schemas/Usuario' }
-        paginacion:
-          type: object
-          required: [pagina, limite, total, total_paginas]
-          properties:
-            pagina: { type: integer, example: 1 }
-            limite: { type: integer, example: 20 }
-            total: { type: integer, example: 55 }
-            total_paginas: { type: integer, example: 3 }
-    Error:
-      type: object
-      required: [error]
-      properties:
-        error:
-          type: object
-          required: [codigo, mensaje]
-          properties:
-            codigo: { type: string, example: 'VALIDACION_ERROR' }
-            mensaje: { type: string, example: 'Datos de entrada inválidos' }
+      description: ID del usuario
+      schema:
+        type: integer
+        minimum: 1
   responses:
     BadRequest:
-      description: Datos de entrada inválidos
+      description: Solicitud o validación incorrecta
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema:
+            $ref: '#/components/schemas/Error'
     Unauthorized:
-      description: Credenciales incorrectas o token ausente, inválido o expirado
+      description: Falta token válido o las credenciales no son válidas
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema:
+            $ref: '#/components/schemas/Error'
     Forbidden:
-      description: Cuenta inactiva o permisos insuficientes
+      description: El usuario no tiene los permisos necesarios
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema:
+            $ref: '#/components/schemas/Error'
     NotFound:
       description: Recurso no encontrado
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema:
+            $ref: '#/components/schemas/Error'
     Conflict:
-      description: Identificador o correo duplicado, o regla de integridad incumplida
+      description: Recurso duplicado o regla de negocio impedida
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
-    TooManyRequests:
-      description: Límite de solicitudes excedido
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
-    InternalError:
-      description: Error inesperado; no exponer detalles internos
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+      - correo
+      - password
+      additionalProperties: false
+      properties:
+        correo:
+          type: string
+          format: email
+          example: alumno@ejemplo.com
+        password:
+          type: string
+          format: password
+          example: MiClaveSegura123!
+    LoginResponse:
+      type: object
+      description: Esquema orientativo; ajustar nombres exactos según respuesta actual de Express.
+      properties:
+        token:
+          type: string
+          description: JWT de acceso
+        expires_in:
+          type: integer
+          example: 3600
+        usuario:
+          $ref: '#/components/schemas/Usuario'
+    CrearUsuarioRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - correo
+      - password
+      - rol_id
+      description: El Administrador crea la cuenta. El campo de identificador anterior ya no forma parte de
+        la solicitud.
+      properties:
+        correo:
+          type: string
+          format: email
+          example: alumno@ejemplo.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: ClaveSegura123!
+        rol_id:
+          type: integer
+          minimum: 1
+          description: ID real del catálogo de roles; no asumir que Alumno siempre es 3
+    ActualizarCorreoRequest:
+      type: object
+      required:
+      - correo
+      additionalProperties: false
+      properties:
+        correo:
+          type: string
+          format: email
+    CambiarPasswordRequest:
+      type: object
+      required:
+      - password_actual
+      - password_nueva
+      additionalProperties: false
+      properties:
+        password_actual:
+          type: string
+          format: password
+        password_nueva:
+          type: string
+          format: password
+    Usuario:
+      type: object
+      description: Representación orientativa del usuario, sin datos de contraseña ni el antiguo identificador.
+      properties:
+        usuario_id:
+          type: integer
+          example: 12
+        correo:
+          type: string
+          format: email
+          example: alumno@ejemplo.com
+        rol_id:
+          type: integer
+          example: 3
+        rol:
+          type: string
+          example: Alumno
+        estatus_id:
+          type: integer
+          example: 1
+        estatus:
+          type: string
+          example: Activo
+        fecha_creacion:
+          type: string
+          format: date-time
+    ListaUsuarios:
+      type: object
+      properties:
+        usuarios:
+          type: array
+          items:
+            $ref: '#/components/schemas/Usuario'
+        total:
+          type: integer
+          example: 25
+        pagina:
+          type: integer
+          example: 1
+        limite:
+          type: integer
+          example: 10
+    Rol:
+      type: object
+      properties:
+        rol_id:
+          type: integer
+          example: 3
+        nombre:
+          type: string
+          example: Alumno
+    Estatus:
+      type: object
+      properties:
+        estatus_id:
+          type: integer
+          example: 1
+        nombre:
+          type: string
+          example: Activo
+    Error:
+      type: object
+      description: Formato orientativo; confirmar con los manejadores de errores actuales.
+      properties:
+        error:
+          type: string
+          example: CREDENCIALES_INVALIDAS
+        mensaje:
+          type: string
+          example: Solicitud no válida
+    ActualizarCorreoPropioRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - correo
+      - password
+      properties:
+        correo:
+          type: string
+          format: email
+          example: nuevo@ejemplo.com
+        password:
+          type: string
+          format: password
+          description: Contraseña actual (no la nueva)
+    ActualizarCorreoPropioResponse:
+      type: object
+      properties:
+        mensaje:
+          type: string
+          example: Correo actualizado correctamente
+        usuario:
+          type: object
+          properties:
+            usuario_id:
+              type: integer
+              example: 2
+            correo:
+              type: string
+              format: email
+              example: nuevo@ejemplo.com

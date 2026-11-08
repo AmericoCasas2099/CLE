@@ -1,9 +1,8 @@
 const { z } = require("zod");
 
 const loginSchema = z.object({
-    identificador_acceso: z.string()
-        .min(1, "El identificador es obligatorio")
-        .max(30),
+    correo: z.string()
+        .trim().email(),
 
     password: z.string()
         .min(1, "La contraseña es obligatoria")
@@ -27,7 +26,9 @@ const cambiarPasswordSchema = z.object({
     }
 );
 
+
 module.exports = {
     loginSchema,
-    cambiarPasswordSchema
+    cambiarPasswordSchema,
+    actualizarCorreoSchema
 };

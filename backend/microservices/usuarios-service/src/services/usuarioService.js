@@ -47,7 +47,6 @@ async function crearUsuario(datos) {
         }
         const password_hash = await bcrypt.hash(datos.password, 12);
         const nuevo = await repo.crear({
-            identificador_acceso: datos.identificador_acceso,
             correo: datos.correo ?? null,
             password_hash,
             rol_id: rol.rol_id,

@@ -1,7 +1,7 @@
 const pool = require("../config/db");
 
 const SELECT_BASE = `
-    SELECT u.usuario_id, u.identificador_acceso, u.correo, u.fecha_creacion,
+    SELECT u.usuario_id, u.correo, u.fecha_creacion,
            r.rol_id, r.nombre AS rol,
            e.estatus_id, e.nombre AS estatus
     FROM public.usuario u
@@ -9,19 +9,27 @@ const SELECT_BASE = `
     INNER JOIN public.estatus_usuario e ON e.estatus_id = u.estatus_id
 `;
 
-async function buscarPorIdentificador(identificador, db = pool) {
-    const { rows } = await db.query(`
-        SELECT u.usuario_id, u.identificador_acceso, u.correo,
-               u.password_hash, u.fecha_creacion,
-               r.rol_id, r.nombre AS rol,
-               e.estatus_id, e.nombre AS estatus
-        FROM public.usuario u
-        INNER JOIN public.rol r ON r.rol_id = u.rol_id
-        INNER JOIN public.estatus_usuario e ON e.estatus_id = u.estatus_id
-        WHERE u.identificador_acceso = $1
-    `, [identificador]);
-    return rows[0] || null;
+
+async function buscarPorCorreo(correo) {
+    const resultado = await pool.query(
+        `SELECT
+            u.usuario_id,
+            u.correo,
+            u.password_hash,
+            u.rol_id,
+            r.nombre AS rol,
+            u.estatus_id,
+            e.nombre AS estatus
+         FROM public.usuario u
+         JOIN public.rol r ON u.rol_id = r.rol_id
+         JOIN public.estatus_usuario e ON u.estatus_id = e.estatus_id
+         WHERE LOWER(TRIM(u.correo)) = LOWER(TRIM($1))`,
+        [correo]
+    );
+
+    return resultado.rows[0] || null;
 }
+
 
 async function buscarPorId(id, db = pool) {
     const { rows } = await db.query(`${SELECT_BASE} WHERE u.usuario_id = $1`, [id]);
@@ -85,14 +93,15 @@ async function obtenerEstatus(db = pool) {
 async function crear(datos, db = pool) {
     const { rows } = await db.query(`
         INSERT INTO public.usuario
-            (identificador_acceso, correo, password_hash, rol_id, estatus_id)
-        VALUES ($1, $2, $3, $4, $5)
+            (correo, password_hash, rol_id, estatus_id)
+        VALUES ($1, $2, $3, $4)
         RETURNING usuario_id
-    `, [datos.identificador_acceso, datos.correo, datos.password_hash,
+    `, [datos.correo, datos.password_hash,
         datos.rol_id, datos.estatus_id]);
     return rows[0];
 }
 
+//El admin cambia el correo de un usuario
 async function actualizar(usuario_id, datos, db = pool) {
     const resultado = await db.query(
         `
@@ -159,9 +168,43 @@ async function actualizarPassword(id, passwordHash, db = pool) {
     return rows[0] || null;
 }
 
+
+async function obtenerUsuarioParaCambioCorreo(client, usuarioId) {
+    const resultado = await client.query(
+        `SELECT
+            u.usuario_id,
+            u.correo,
+            u.password_hash,
+            e.nombre AS estatus
+         FROM public.usuario u
+         INNER JOIN public.estatus_usuario e
+            ON e.estatus_id = u.estatus_id
+         WHERE u.usuario_id = $1
+         FOR UPDATE OF u`,
+        [usuarioId]
+    );
+
+    return resultado.rows[0] || null;
+}
+
+//El usuario cambia su propio correo
+async function actualizarCorreoUsuario(client, usuarioId, correo) {
+    const resultado = await client.query(
+        `UPDATE public.usuario
+         SET correo = $1
+         WHERE usuario_id = $2
+         RETURNING usuario_id, correo`,
+        [correo, usuarioId]
+    );
+
+    return resultado.rows[0] || null;
+}
+
+
 module.exports = {
-    buscarPorIdentificador, buscarPorId, listar, contarUsuarios,
+    buscarPorId, buscarPorCorreo, listar, contarUsuarios,
     contarAdministradoresActivos, buscarRolPorId, buscarRolPorNombre,
     buscarEstatusPorNombre, obtenerRoles, obtenerEstatus,
-    crear, actualizar, cambiarEstatus, cambiarRol, obtenerPasswordHash, actualizarPassword
+    crear, actualizar, cambiarEstatus, cambiarRol, obtenerPasswordHash, actualizarPassword, 
+    obtenerUsuarioParaCambioCorreo, actualizarCorreoUsuario
 };

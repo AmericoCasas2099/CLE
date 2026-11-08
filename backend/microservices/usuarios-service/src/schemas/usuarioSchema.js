@@ -11,8 +11,7 @@ const correo = z.union([
 ]);
 
 const crearUsuarioSchema = z.object({
-    identificador_acceso: z.string().trim().min(1).max(30),
-    correo: correo.optional(),
+    correo: correo,
     password: passwordSegura,
     rol_id: z.number().int().positive()
 }).strict();
@@ -22,7 +21,6 @@ const actualizarUsuarioSchema = z.object({
         error: "Correo electrónico inválido"
     })
     .max(150, "Máximo 150 caracteres")
-    .nullable()
 }).strict();
 
 const cambiarEstatusSchema = z.object({
