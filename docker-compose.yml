@@ -13,6 +13,8 @@ services:
     depends_on:
       usuarios-service:
         condition: service_healthy
+      academico-service:
+        condition: service_healthy
 
   usuarios-service:
     build:
@@ -34,6 +36,39 @@ services:
         - node
         - -e
         - "require('http').get('http://127.0.0.1:3001/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  academico-service:
+    build:
+      context: ./backend/microservices/academico-service
+      dockerfile: Dockerfile
+
+    container_name: cle-academico-service
+    restart: unless-stopped
+
+    env_file:
+      - ./backend/microservices/academico-service/.env
+
+    environment:
+      PORT: "3002"
+      USUARIOS_SERVICE_URL: "http://usuarios-service:3001"
+
+    expose:
+      - "3002"
+
+    depends_on:
+      usuarios-service:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:3002/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
       interval: 30s
       timeout: 5s
       retries: 3
