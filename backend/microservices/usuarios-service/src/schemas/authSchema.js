@@ -30,5 +30,4 @@ const cambiarPasswordSchema = z.object({
 module.exports = {
     loginSchema,
     cambiarPasswordSchema,
-    actualizarCorreoSchema
 };
