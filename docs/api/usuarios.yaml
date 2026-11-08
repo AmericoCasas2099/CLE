@@ -5,7 +5,7 @@ info:
   description: 'Contrato OpenAPI del microservicio de usuarios del CLE.
 
     Inicio de sesión con correo y contraseña. La creación de cuentas es exclusiva 
-    del Administrador. No incluye autorregistro ni verificación de correo.
+    del Administrador.
 
     '
 servers:
@@ -291,13 +291,16 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-              - estatus_id
-              properties:
-                estatus_id:
-                  type: integer
-                  minimum: 1
               additionalProperties: false
+              required:
+               - estatus
+              properties:
+               estatus:
+                type: string
+                enum:
+                  - Activo
+                  - Inactivo
+                example: Activo
       responses:
         '200':
           description: Estatus actualizado
