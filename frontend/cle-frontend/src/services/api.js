@@ -17,16 +17,15 @@ api.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 )
+
 // Interceptor de respuestas para capturar sesiones caducadas
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && !skipRedirect) {
+    if (error.response?.status === 401 && window.location.pathname !== '/login') {
       localStorage.removeItem('cle_token')
       localStorage.removeItem('cle_user')
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
-      }
+      window.location.href = '/login'
     }
     return Promise.reject(error)
   }
