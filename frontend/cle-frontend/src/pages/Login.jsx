@@ -22,32 +22,42 @@ export function Login() {
     setError('')
 
     try {
-      // 1. Envío exclusivo de credenciales exigidas por el backend
       const response = await api.post('/api/v1/auth/login', {
         correo: email.trim(),
         password: password.trim(),
       })
 
-      // 2. Extracción de token y datos de usuario
-      const { token, access_token, user } = response.data
-      const authToken = token || access_token
-
+      // 1. Extracción segura del token
+      const authToken = response.data.token || response.data.access_token
       if (authToken) {
         localStorage.setItem('cle_token', authToken)
       }
-      localStorage.setItem('cle_user', JSON.stringify(user || {}))
 
-      // 3. Redirección basada en el rol dictaminado por el backend
-      const userRole = user?.rol || user?.role
-      if (userRole === 'Administrador') {
-        navigate('/admin/dashboard')
-      } else if (userRole === 'Maestro') {
-        navigate('/docente/grupos')
-      } else if (userRole === 'Alumno') {
-        navigate('/alumno/horario')
+      // 2. Extracción de usuario (en español como lo manda el backend)
+      const rawUser = response.data.usuario || response.data.user || {}
+
+      // 3. Obtener rol_id y nombre del rol desde el objeto anidado rol: { rol_id, nombre }
+      const roleId = Number(rawUser.rol?.rol_id ?? rawUser.rol_id ?? 1)
+      const roleName = rawUser.rol?.nombre || rawUser.rol || 'Administrador'
+
+      // 4. Guardar datos de usuario estructurados para el AppShell y Sidebar
+      const sessionUser = {
+        usuario_id: rawUser.usuario_id,
+        correo: rawUser.correo,
+        rol_id: roleId,
+        rol: roleName,
+        role: roleName,
+        nombre: rawUser.correo ? rawUser.correo.split('@')[0] : 'Usuario CLE',
+      }
+      localStorage.setItem('cle_user', JSON.stringify(sessionUser))
+
+      // 5. Redirección según rol_id (1: Admin, 2: Maestro, 3: Alumno)
+      if (roleId === 2 || roleName === 'Maestro') {
+        navigate('/maestros/grupos', { replace: true })
+      } else if (roleId === 3 || roleName === 'Alumno') {
+        navigate('/alumnos/mitablero', { replace: true })
       } else {
-        // En caso de que el rol venga con otra nomenclatura o no esté especificado
-        navigate('/admin/dashboard')
+        navigate('/admin/dashboard', { replace: true })
       }
     } catch (err) {
       if (!err.response) {
@@ -81,7 +91,7 @@ export function Login() {
           </p>
         </div>
 
-        {/* Formulario limpio */}
+        {/* Formulario */}
         <form
           onSubmit={handleSubmit}
           className="flex flex-col gap-5 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm"
@@ -95,7 +105,7 @@ export function Login() {
               id="email"
               type="email"
               autoComplete="email"
-              placeholder="usuario@queretaro.tecnm.mx"
+              placeholder="usuario@gmail.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="flex h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
@@ -130,7 +140,7 @@ export function Login() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-zinc-400">Periodo escolar activo</p>
+        <p className="mt-6 text-center text-xs text-zinc-400">Periodo escolar activo 2026-B</p>
       </div>
     </main>
   )

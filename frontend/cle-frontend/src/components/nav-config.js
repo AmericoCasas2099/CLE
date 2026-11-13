@@ -10,6 +10,8 @@ import {
   CalendarClock,
   ClipboardList,
   BookOpen,
+  ShieldCheck,
+  Presentation,
 } from 'lucide-react'
 
 export const BrandIcon = BookOpen
@@ -19,6 +21,12 @@ export const NAV_ADMIN = [
     label: 'PANEL PRINCIPAL',
     items: [
       { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'ACCESO Y ROLES',
+    items: [
+      { label: 'Usuarios', path: '/admin/usuarios', icon: ShieldCheck },
     ],
   },
   {
@@ -45,15 +53,21 @@ export const NAV_ADMIN = [
       { label: 'Inscripciones', path: '/admin/inscripciones', icon: ClipboardList },
     ],
   },
+  {
+    label: 'Usuarios',
+    items: [
+      { label: 'Mi Perfil', path: '/docente/perfil', icon: UserCheck },
+    ],
+  },
 ]
 
 export const NAV_MAESTRO = [
   {
     label: 'DOCENCIA',
     items: [
-      { label: 'Mis Grupos', path: '/docente/grupos', icon: Users },
-      { label: 'Mi Horario', path: '/docente/horario', icon: CalendarClock },
-      { label: 'Mi Perfil', path: '/docente/perfil', icon: UserCheck },
+      { label: 'Mis Grupos', path: '/maestros/grupos', icon: Users },
+      { label: 'Mi Horario', path: '/maestros/horario', icon: CalendarClock },
+      { label: 'Mi Perfil', path: '/maestros/perfil', icon: UserCheck },
     ],
   },
 ]
@@ -62,9 +76,8 @@ export const NAV_ALUMNO = [
   {
     label: 'ESTUDIANTE',
     items: [
-      { label: 'Mi Horario', path: '/alumno/horario', icon: CalendarClock },
-      { label: 'Inscripción', path: '/alumno/inscripcion', icon: ClipboardList },
-      { label: 'Mi Perfil', path: '/alumno/perfil', icon: GraduationCap },
+      { label: 'Mi Horario', path: '/alumnos/mitablero', icon: CalendarClock },
+      { label: 'Mi Perfil', path: '/alumnos/perfil', icon: GraduationCap },
     ],
   },
 ]

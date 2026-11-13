@@ -17,14 +17,18 @@ export function AppShell() {
   if (userRole === 'Alumno') navItems = NAV_ALUMNO
 
   // Mapeo dinámico del breadcrumb según la ruta actual
-  const getBreadcrumbLabel = () => {
-    if (location.pathname.includes('/admin/dashboard')) return 'Dashboard'
-    if (location.pathname.includes('/admin/campus')) return 'Campus'
-    if (location.pathname.includes('/admin/salones')) return 'Salones'
-    if (location.pathname.includes('/admin/maestros')) return 'Maestros'
-    if (location.pathname.includes('/admin/alumnos')) return 'Alumnos'
-    if (location.pathname.includes('/admin/grupos')) return 'Grupos'
-    return 'Panel'
+  const getBreadcrumb = () => {
+    const path = location.pathname
+    if (path.startsWith('/admin/usuarios')) {
+      return { section: 'Acceso y Roles', page: 'Usuarios' }
+    }
+    if (path.startsWith('/maestros/')) {
+      return { section: 'Docencia', page: path.includes('horario') ? 'Mi Horario' : 'Mis Grupos' }
+    }
+    if (path.startsWith('/alumnos/')) {
+      return { section: 'Mi Espacio', page: 'Mi Tablero' }
+    }
+    return { section: 'Panel Principal', page: 'Dashboard' }
   }
 
   return (
@@ -54,9 +58,9 @@ export function AppShell() {
             <nav className="flex items-center gap-2 text-sm">
               <span className="font-semibold text-zinc-800">CLE</span>
               <ChevronRight className="size-4 text-zinc-400" />
-              <span className="text-zinc-500">Panel Principal</span>
+              <span className="text-zinc-500">{getBreadcrumb().section}</span>
               <ChevronRight className="size-4 text-zinc-400" />
-              <span className="font-medium text-zinc-900">{getBreadcrumbLabel()}</span>
+              <span className="font-medium text-zinc-900">{getBreadcrumb().page}</span>
             </nav>
           </div>
 

@@ -170,8 +170,13 @@ export function Sidebar({
             <button
               type="button"
               title="Cerrar sesión"
+              aria-label="Cerrar sesión"
               onClick={handleLogout}
-              className="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
+              className={cn(
+                'group flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-600 transition-all duration-150',
+                'hover:border-rose-600 hover:bg-rose-600 hover:text-white hover:shadow-xs active:scale-95',
+                collapsed && 'lg:size-9 lg:p-0'
+              )}
             >
               <LogOut className="size-4" aria-hidden="true" />
               <span className="sr-only">Cerrar sesión</span>
