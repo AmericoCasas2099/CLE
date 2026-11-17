@@ -12,7 +12,7 @@ servers:
 - url: https://aircraft-sept-maker-mug.trycloudflare.com
   description: /health responde desde gateway Nginx
 - url: http://localhost:3001
-  description: Desarrollo local (acceso directo al microservicio)
+  description: Desarrollo local
 tags:
 - name: Autenticación
 - name: Usuarios

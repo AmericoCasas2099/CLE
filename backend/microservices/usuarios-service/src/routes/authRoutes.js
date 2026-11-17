@@ -8,15 +8,18 @@ const {loginSchema,cambiarPasswordSchema } = require("../schemas/authSchema");
 
 const router = express.Router();
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 10,
+    windowMs: 3 * 60 * 1000,
+    limit: 15,
     standardHeaders: "draft-7",
     legacyHeaders: false,
+    skipSuccessfulRequests: true,
     message: { error: { codigo: "DEMASIADOS_INTENTOS", mensaje: "Inténtalo más tarde" } }
+    
 });
 
 router.post("/login", loginLimiter, validateMiddleware(loginSchema), authController.login);
 router.get("/perfil", authMiddleware, authController.perfil);
 router.put("/cambiar-password",authMiddleware,validateMiddleware(cambiarPasswordSchema),authController.cambiarPassword);
 router.patch("/perfil",authMiddleware,authController.actualizarCorreo);
+router.put("/cambiar-password",authMiddleware,authController.cambiarPassword);
 module.exports = router;

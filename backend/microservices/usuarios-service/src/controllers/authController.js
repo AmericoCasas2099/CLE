@@ -15,21 +15,37 @@ function perfil(req, res) {
     return res.status(200).json({ usuario: req.usuario });
 }
 
+const cambiarPasswordSchema = z.object({
+    password_actual: z.string().min(1, "La contraseña actual es obligatoria"),
+    // La política completa, dependiente del correo real, se valida en authService.
+    password_nueva: z.string().min(1, "La contraseña nueva es obligatoria")
+}).strict();
+
 async function cambiarPassword(req, res, next) {
+    const validacion = cambiarPasswordSchema.safeParse(req.body);
+    if (!validacion.success) {
+        return res.status(400).json({
+            error: "VALIDACION_ERROR",
+            detalles: validacion.error.issues
+        });
+    }
+
+    // Acepta ambos formatos usados en el proyecto, solo de datos ya
+    // verificados por el middleware de autenticación.
+    const usuarioId = Number(
+        req.auth?.sub ?? req.auth?.usuario_id ?? req.usuario?.usuario_id
+    );
+    if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0) {
+        return res.status(401).json({ error: "TOKEN_INVALIDO" });
+    }
+
     try {
-        const {
-            password_actual,
-            password_nueva
-        } = req.body;
-
         await authService.cambiarPassword(
-            req.auth.usuario_id,
-            password_actual,
-            password_nueva
+            usuarioId,
+            validacion.data.password_actual,
+            validacion.data.password_nueva
         );
-
         return res.status(204).send();
-
     } catch (error) {
         next(error);
     }
@@ -42,31 +58,23 @@ const actualizarCorreoSchema = z.object({
 
 async function actualizarCorreo(req, res) {
     const validacion = actualizarCorreoSchema.safeParse(req.body);
-
     if (!validacion.success) {
         return res.status(400).json({
             error: "DATOS_INVALIDOS",
             detalles: validacion.error.issues
         });
     }
-
     try {
         const usuarioId = req.usuario?.usuario_id;
-
         if (!usuarioId) {
-            return res.status(401).json({
-                error: "TOKEN_INVALIDO"
-            });
+            return res.status(401).json({ error: "TOKEN_INVALIDO" });
         }
-
         const resultado = await authService.actualizarCorreoPropio(
             usuarioId,
             validacion.data.correo,
             validacion.data.password
         );
-
         return res.status(200).json(resultado);
-
     } catch (error) {
         const erroresConocidos = {
             USUARIO_NO_DISPONIBLE: 403,
@@ -74,20 +82,10 @@ async function actualizarCorreo(req, res) {
             CORREO_SIN_CAMBIOS: 400,
             CORREO_DUPLICADO: 409
         };
-
         const status = erroresConocidos[error.message];
-
-        if (status) {
-            return res.status(status).json({
-                error: error.message
-            });
-        }
-
+        if (status) return res.status(status).json({ error: error.message });
         console.error("Error al actualizar correo:", error);
-
-        return res.status(500).json({
-            error: "ERROR_INTERNO"
-        });
+        return res.status(500).json({ error: "ERROR_INTERNO" });
     }
 }
 

@@ -1,14 +1,15 @@
 const bcrypt = require("bcrypt");
 const usuarioRepository = require("../repositories/usuarioRepository");
 const pool = require("../config/db");
-
 const { generarToken, verificarToken } = require("../utils/jwt");
+const { crearPasswordSchema } = require("../validators/passwordSchema");
 
 class AuthError extends Error {
-    constructor(codigo, mensaje, status = 401) {
+    constructor(codigo, mensaje, status = 401, detalles = undefined) {
         super(mensaje);
         this.codigo = codigo;
         this.status = status;
+        if (detalles) this.detalles = detalles;
     }
 }
 
@@ -25,14 +26,13 @@ function formatearUsuario(usuario) {
 
 async function login(correo, password) {
     const usuario = await usuarioRepository.buscarPorCorreo(correo);
-    // Respuesta para usuario inexistente o contraseña equivocada.
+    // No aplicar aquí la nueva política; las contraseñas anteriores siguen siendo válidas.
     if (!usuario || !(await bcrypt.compare(password, usuario.password_hash))) {
         throw new AuthError("CREDENCIALES_INVALIDAS", "Identificador o contraseña incorrectos");
     }
     if (usuario.estatus !== "Activo") {
         throw new AuthError("USUARIO_INACTIVO", "La cuenta está inactiva", 403);
     }
-
     const token = generarToken({ usuario_id: usuario.usuario_id, rol: usuario.rol });
     const payload = verificarToken(token);
     return {
@@ -45,147 +45,91 @@ async function login(correo, password) {
 
 async function cambiarPassword(usuarioId, passwordActual, passwordNueva) {
     const db = await pool.connect();
-
     try {
         await db.query("BEGIN");
-
-        // Bloquear el registro para evitar cambios simultáneos
+        // Se reutiliza el bloqueo transaccional que ya tenía el servicio.
         const resultado = await db.query(
-            `
-            SELECT password_hash
-            FROM public.usuario
-            WHERE usuario_id = $1
-            FOR UPDATE
-            `,
+            `SELECT correo, password_hash
+             FROM public.usuario
+             WHERE usuario_id = $1
+             FOR UPDATE`,
             [usuarioId]
         );
-
         const usuario = resultado.rows[0];
-
         if (!usuario) {
-            throw new AuthError(
-                "USUARIO_NO_ENCONTRADO",
-                "El usuario no existe",
-                404
-            );
+            throw new AuthError("USUARIO_NO_ENCONTRADO", "El usuario no existe", 404);
         }
-
-        // Verificar contraseña actual
-        const passwordValida = await bcrypt.compare(
-            passwordActual,
-            usuario.password_hash
-        );
-
+        const passwordValida = await bcrypt.compare(passwordActual, usuario.password_hash);
         if (!passwordValida) {
-            throw new AuthError(
-                "PASSWORD_INCORRECTA",
-                "La contraseña actual es incorrecta",
-                400
-            );
+            throw new AuthError("PASSWORD_INCORRECTA", "La contraseña actual es incorrecta", 400);
         }
-
-        // Comprobar que realmente sea diferente
-        const esIgual = await bcrypt.compare(
-            passwordNueva,
-            usuario.password_hash
-        );
-
+        const esIgual = await bcrypt.compare(passwordNueva, usuario.password_hash);
         if (esIgual) {
+            throw new AuthError("PASSWORD_REPETIDA", "La nueva contraseña debe ser diferente a la actual", 400);
+        }
+
+        const validacion = crearPasswordSchema({ correo: usuario.correo }).safeParse(passwordNueva);
+        if (!validacion.success) {
             throw new AuthError(
-                "PASSWORD_REPETIDA",
-                "La nueva contraseña debe ser diferente a la actual",
-                400
+                "PASSWORD_INVALIDA",
+                "La nueva contraseña no cumple la política de seguridad",
+                400,
+                validacion.error.issues.map(issue => ({
+                    campo: "password_nueva",
+                    mensaje: issue.message
+                }))
             );
         }
 
-        // Generar hash y actualizar contraseña
-        const nuevoHash = await bcrypt.hash(
-            passwordNueva,
-            12
-        );
-
-        await usuarioRepository.actualizarPassword(
-            usuarioId,
-            nuevoHash,
-            db
-        );
-
+        const nuevoHash = await bcrypt.hash(passwordNueva, 12);
+        await usuarioRepository.actualizarPassword(usuarioId, nuevoHash, db);
         await db.query("COMMIT");
-
     } catch (error) {
         await db.query("ROLLBACK");
         throw error;
-
     } finally {
         db.release();
     }
 }
 
-
 async function actualizarCorreoPropio(usuarioId, correo, password) {
     const client = await pool.connect();
-
     try {
         await client.query("BEGIN");
-
-        const usuario = await usuarioRepository.obtenerUsuarioParaCambioCorreo(
-            client,
-            usuarioId
-        );
-
+        const usuario = await usuarioRepository.obtenerUsuarioParaCambioCorreo(client, usuarioId);
         if (!usuario || usuario.estatus !== "Activo") {
             const error = new Error("USUARIO_NO_DISPONIBLE");
             error.status = 403;
             throw error;
         }
-
-        const passwordValida = await bcrypt.compare(
-            password,
-            usuario.password_hash
-        );
-
+        const passwordValida = await bcrypt.compare(password, usuario.password_hash);
         if (!passwordValida) {
             const error = new Error("CREDENCIALES_INVALIDAS");
             error.status = 401;
             throw error;
         }
-
         const correoNormalizado = correo.trim().toLowerCase();
-
         if (usuario.correo === correoNormalizado) {
             const error = new Error("CORREO_SIN_CAMBIOS");
             error.status = 400;
             throw error;
         }
-
         const actualizado = await usuarioRepository.actualizarCorreoUsuario(
-            client,
-            usuarioId,
-            correoNormalizado
+            client, usuarioId, correoNormalizado
         );
-
         await client.query("COMMIT");
-
-        return {
-            mensaje: "Correo actualizado correctamente",
-            usuario: actualizado
-        };
-
+        return { mensaje: "Correo actualizado correctamente", usuario: actualizado };
     } catch (error) {
         await client.query("ROLLBACK");
-
         if (error.code === "23505") {
             const conflicto = new Error("CORREO_DUPLICADO");
             conflicto.status = 409;
             throw conflicto;
         }
-
         throw error;
-
     } finally {
         client.release();
     }
 }
-
 
 module.exports = { login, formatearUsuario, cambiarPassword, actualizarCorreoPropio, AuthError };

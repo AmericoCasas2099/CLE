@@ -201,10 +201,37 @@ async function actualizarCorreoUsuario(client, usuarioId, correo) {
 }
 
 
+async function obtenerCredenciales(usuarioId) {
+    const resultado = await pool.query(
+        `SELECT usuario_id, password_hash
+         FROM public.usuario
+         WHERE usuario_id = $1`,
+        [usuarioId]
+    );
+
+    return resultado.rows[0] || null;
+}
+
+
+async function actualizarPassword(usuarioId, nuevoHash, db = pool) {
+    const resultado = await db.query(
+        `UPDATE public.usuario
+         SET password_hash = $1
+         WHERE usuario_id = $2
+         RETURNING usuario_id`,
+        [nuevoHash, usuarioId]
+    );
+
+    return resultado.rowCount === 1;
+}
+
+
+
+
 module.exports = {
     buscarPorId, buscarPorCorreo, listar, contarUsuarios,
     contarAdministradoresActivos, buscarRolPorId, buscarRolPorNombre,
     buscarEstatusPorNombre, obtenerRoles, obtenerEstatus,
     crear, actualizar, cambiarEstatus, cambiarRol, obtenerPasswordHash, actualizarPassword, 
-    obtenerUsuarioParaCambioCorreo, actualizarCorreoUsuario
+    obtenerUsuarioParaCambioCorreo, actualizarCorreoUsuario, actualizarPassword
 };

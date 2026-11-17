@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const pool = require("../config/db");
 const repo = require("../repositories/usuarioRepository");
 const { formatearUsuario } = require("./authService");
+const { crearPasswordSchema } = require("../validators/passwordSchema");
 
 const ROLES_PERMITIDOS = new Set(["Administrador", "Maestro", "Alumno"]);
 
@@ -36,6 +37,19 @@ async function obtenerRolValido(rolId, db) {
 }
 
 async function crearUsuario(datos) {
+    // Aplicar la misma política a toda cuenta nueva, aunque la ruta no
+    // tenga un esquema Zod propio.
+    const validacion = crearPasswordSchema({ correo: datos.correo }).safeParse(datos.password);
+    if (!validacion.success) {
+        const error = new UsuarioError(
+            "PASSWORD_INVALIDA", "La contraseña no cumple la política de seguridad", 400
+        );
+        error.detalles = validacion.error.issues.map(issue => ({
+            campo: "password",
+            mensaje: issue.message
+        }));
+        throw error;
+    }
     const db = await pool.connect();
     try {
         await db.query("BEGIN");
