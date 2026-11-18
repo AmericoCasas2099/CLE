@@ -1,0 +1,11 @@
+const router = require("express").Router();
+const controller = require("../controllers/salonController");
+const auth = require("../middlewares/authMiddleware");
+const { soloAdministrador } = require("../middlewares/roleMiddleware");
+router.use(auth);
+router.get("/",controller.listar);
+router.get("/:id",controller.obtener);
+router.post("/",soloAdministrador,controller.crear);
+router.patch("/:id",soloAdministrador,controller.modificar);
+router.patch("/:id/estatus",soloAdministrador,controller.cambiarEstatus);
+module.exports = router;
