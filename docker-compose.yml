@@ -108,3 +108,22 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+  inscripciones-service:
+    build:
+      context: ./microservices/inscripciones-service
+      dockerfile: Dockerfile
+    container_name: cle-inscripciones-service
+    restart: unless-stopped
+
+    env_file:
+      - ./backend/microservices/inscripciones-service/.env
+
+    environment:
+      NODE_ENV: production
+      PORT: "3004"
+      ACADEMICO_SERVICE_URL: http://academico-service:3002
+      INFRAESTRUCTURA_SERVICE_URL: http://infraestructura-service:3003
+
+    ports:
+      - "3004:3004"
