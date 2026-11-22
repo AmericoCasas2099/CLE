@@ -1,0 +1,11 @@
+const express = require("express");
+const auth = require("../middlewares/authMiddleware");
+const { permitirRoles } = require("../middlewares/roleMiddleware");
+const c = require("../controllers/catalogoController");
+const router = express.Router();
+router.use(auth);
+router.use(permitirRoles("Administrador", "Maestro", "Alumno"));
+router.get("/", c.listarIdiomas);
+router.get("/:id/niveles", c.nivelesDeIdioma);
+router.get("/:id", c.obtenerIdioma);
+module.exports = router;

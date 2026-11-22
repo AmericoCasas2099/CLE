@@ -5,6 +5,10 @@ const helmet = require("helmet");
 const pool = require("./config/db");
 const maestroRoutes = require("./routes/maestroRoutes");
 const alumnoRoutes = require("./routes/alumnoRoutes");
+const grupoReferenciasRoutes = require("./routes/grupoReferenciasRoutes");
+const resumenAlumnosRoutes = require("./routes/resumenAlumnosRoutes");
+const idiomaRoutes = require("./routes/idiomaRoutes");
+const nivelRoutes = require("./routes/nivelRoutes");
 
 const app = express();
 app.use(helmet());
@@ -22,5 +26,9 @@ app.get("/health", async (_req, res) => {
 
 app.use("/api/v1/maestros", maestroRoutes);
 app.use("/api/v1/alumnos", alumnoRoutes);
+app.use("/api/v1/catalogos", grupoReferenciasRoutes);
+app.use("/api/v1/catalogos", resumenAlumnosRoutes);
+app.use("/api/v1/idiomas", idiomaRoutes);
+app.use("/api/v1/niveles", nivelRoutes);
 app.use((_req, res) => res.status(404).json({ error: "RUTA_NO_ENCONTRADA" }));
 module.exports = app;

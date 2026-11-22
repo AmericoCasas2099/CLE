@@ -1,3 +1,4 @@
+
 const express = require("express");
 const controller = require("../controllers/alumnoController");
 const authMiddleware = require("../middlewares/authMiddleware");
@@ -11,8 +12,8 @@ router.get("/mi-perfil", soloAlumno, controller.obtenerMiPerfil);
 router.post("/mi-perfil", soloAlumno, controller.registrarMiPerfil);
 
 router.post("/", soloAdministrador, controller.registrar);
-router.get("/", soloAdministrador, controller.listar);
-router.get("/:id", permitirRoles("Administrador", "Alumno"), controller.obtener);
+router.get("/", permitirRoles("Administrador", "Maestro"), controller.listar);
+router.get("/:id", permitirRoles("Administrador", "Maestro", "Alumno"), controller.obtener);
 router.patch("/:id", permitirRoles("Administrador", "Alumno"), controller.modificar);
 router.patch("/:id/estatus", soloAdministrador, controller.cambiarEstatus);
 

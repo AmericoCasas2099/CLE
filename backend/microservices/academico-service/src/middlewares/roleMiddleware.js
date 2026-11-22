@@ -1,19 +1,49 @@
-// Usa el JWT verificado por authMiddleware: req.auth.
-function permitirRoles(...rolesPermitidos) {
-  return (req, res, next) => {
-    const rol = req.auth?.rol;
-    if (!rol || !rolesPermitidos.includes(rol)) {
-      return res.status(403).json({
-        error: "ACCESO_DENEGADO",
-        mensaje: "No tienes permisos para realizar esta acción"
-      });
-    }
-    next();
-  };
+
+const { fallo } = require("../utils/http");
+
+// Middleware genérico para verificar roles
+function roles(...permitidos) {
+    return (req, res, next) => {
+        if (!req.auth) {
+            return next(
+                fallo(
+                    401,
+                    "NO_AUTENTICADO",
+                    "Debes iniciar sesión"
+                )
+            );
+        }
+
+        if (!permitidos.includes(req.auth.rol)) {
+            return next(
+                fallo(
+                    403,
+                    "ACCESO_DENEGADO",
+                    "No tienes permiso para realizar esta acción"
+                )
+            );
+        }
+
+        next();
+    };
 }
 
-const soloAdministrador = permitirRoles("Administrador");
-const soloMaestro = permitirRoles("Maestro");
-const soloAlumno = permitirRoles("Alumno");
+// Alias para las rutas existentes
+const permitirRoles = roles;
 
-module.exports = { permitirRoles, soloAdministrador, soloMaestro, soloAlumno };
+// Middlewares específicos
+const soloAdministrador = roles("Administrador");
+const soloMaestro = roles("Maestro");
+const soloAlumno = roles("Alumno");
+
+// Compatibilidad con rutas que utilizan admin
+const admin = soloAdministrador;
+
+module.exports = {
+    roles,
+    permitirRoles,
+    admin,
+    soloAdministrador,
+    soloMaestro,
+    soloAlumno
+};
