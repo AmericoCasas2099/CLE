@@ -22,7 +22,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+    if (error.response?.status === 401 && !error.config?.skipAuthRedirect && window.location.pathname !== '/login') {
       localStorage.removeItem('cle_token')
       localStorage.removeItem('cle_user')
       window.location.href = '/login'

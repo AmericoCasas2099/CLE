@@ -128,13 +128,15 @@ export function Usuarios() {
     consultarUsuarios(1)
   }
 
-  const handleUpdated = (usuarioActualizado) => {
+ const handleUpdated = (usuarioActualizado, meta = {}) => {
     setUsuarios((prev) =>
       prev.map((u) => (u.usuario_id === usuarioActualizado.usuario_id ? usuarioActualizado : u))
     )
     setEditingUser(null)
     setBannerMessage(
-      `Usuario #${usuarioActualizado.usuario_id} (${usuarioActualizado.correo}) actualizado correctamente.`
+      `Usuario #${usuarioActualizado.usuario_id} (${usuarioActualizado.correo}) actualizado correctamente${
+        meta.passwordUpdated ? ' · Contraseña actualizada' : ''
+      }.`
     )
     consultarUsuarios(pagina)
   }
@@ -613,6 +615,9 @@ function ActualizarUsuarioModal({ usuario, onClose, onSuccess }) {
   const [correo, setCorreo] = useState(initialCorreo)
   const [rolId, setRolId] = useState(initialRolId)
   const [estatusId, setEstatusId] = useState(initialEstatusId)
+  const [nuevaPassword, setNuevaPassword] = useState('')
+  const [confirmarPassword, setConfirmarPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -629,8 +634,20 @@ function ActualizarUsuarioModal({ usuario, onClose, onSuccess }) {
     const cambioCorreo = correoLimpio !== initialCorreo
     const cambioRol = Number(rolId) !== initialRolId
     const cambioEstatus = Number(estatusId) !== initialEstatusId
+    const cambioPassword = nuevaPassword.length > 0 || confirmarPassword.length > 0
 
-    if (!cambioCorreo && !cambioRol && !cambioEstatus) {
+    if (cambioPassword) {
+      if (nuevaPassword.length < 6) {
+        setError('La nueva contraseña debe tener al menos 6 caracteres.')
+        return
+      }
+      if (nuevaPassword !== confirmarPassword) {
+        setError('Las contraseñas no coinciden.')
+        return
+      }
+    }
+
+    if (!cambioCorreo && !cambioRol && !cambioEstatus && !cambioPassword) {
       onClose()
       return
     }
@@ -693,16 +710,28 @@ function ActualizarUsuarioModal({ usuario, onClose, onSuccess }) {
         }
       }
 
-      onSuccess({
-        ...ultimoUsuario,
-        usuario_id: usuario.usuario_id,
-        correo: ultimoUsuario.correo ?? correoLimpio,
-        rol: ultimoUsuario.rol ?? { rol_id: Number(rolId), nombre: rolObj?.nombre || 'Usuario' },
-        estatus: ultimoUsuario.estatus ?? {
-          estatus_id: Number(estatusId),
-          nombre: estatusNombre,
+      // 4. Actualizar contraseña (PATCH /api/v1/usuarios/:id/password)
+      if (cambioPassword) {
+        await api.patch(
+          `/api/v1/usuarios/${usuario.usuario_id}/password`,
+          { password: nuevaPassword },
+          { skipAuthRedirect: true }
+        )
+      }
+
+      onSuccess(
+        {
+          ...ultimoUsuario,
+          usuario_id: usuario.usuario_id,
+          correo: ultimoUsuario.correo ?? correoLimpio,
+          rol: ultimoUsuario.rol ?? { rol_id: Number(rolId), nombre: rolObj?.nombre || 'Usuario' },
+          estatus: ultimoUsuario.estatus ?? {
+            estatus_id: Number(estatusId),
+            nombre: estatusNombre,
+          },
         },
-      })
+        { passwordUpdated: cambioPassword }
+      )
     } catch (err) {
       const apiError = err.response?.data?.error
       const detalle = Array.isArray(apiError?.detalles)
@@ -729,7 +758,7 @@ function ActualizarUsuarioModal({ usuario, onClose, onSuccess }) {
               Actualizar Usuario #{usuario.usuario_id}
             </h2>
             <p className="mt-0.5 text-xs text-zinc-500">
-              Modifica correo, rol asignado o estatus de acceso
+              Modifica correo, rol, estatus o asigna una nueva contraseña
             </p>
           </div>
           <button
@@ -742,7 +771,7 @@ function ActualizarUsuarioModal({ usuario, onClose, onSuccess }) {
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
-          <div className="space-y-4 px-6 py-5">
+          <div className="max-h-[75vh] space-y-4 overflow-y-auto px-6 py-5">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="edit-correo" className="text-xs font-medium text-zinc-700">
                 Correo electrónico
@@ -787,6 +816,53 @@ function ActualizarUsuarioModal({ usuario, onClose, onSuccess }) {
                   <option value={1}>Activo</option>
                   <option value={2}>Inactivo</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Cambio de contraseña opcional */}
+            <div className="space-y-3 border-t border-zinc-100 pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-zinc-700">
+                  Cambiar contraseña <span className="font-normal text-zinc-400">(opcional)</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                >
+                  {showPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  {showPassword ? 'Ocultar' : 'Mostrar'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="edit-pass" className="text-xs font-medium text-zinc-600">
+                    Nueva contraseña
+                  </label>
+                  <input
+                    id="edit-pass"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Dejar vacío para conservar"
+                    value={nuevaPassword}
+                    onChange={(e) => setNuevaPassword(e.target.value)}
+                    className="flex h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="edit-pass-confirm" className="text-xs font-medium text-zinc-600">
+                    Confirmar contraseña
+                  </label>
+                  <input
+                    id="edit-pass-confirm"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Repite la nueva clave"
+                    value={confirmarPassword}
+                    onChange={(e) => setConfirmarPassword(e.target.value)}
+                    className="flex h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
               </div>
             </div>
 

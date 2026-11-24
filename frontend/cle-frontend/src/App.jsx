@@ -9,6 +9,7 @@ import { MiTablero } from './pages/alumno/MiTablero'
 import { Usuarios } from './pages/admin/Usuarios'
 import { Maestros } from './pages/admin/Maestros'
 import { Alumnos } from './pages/admin/Alumnos'
+import { Infraestructura } from '@/pages/admin/Infraestructura'
 
 function ModuloPendiente() {
   return (
@@ -33,6 +34,8 @@ export default function App() {
             <Route path="/admin/usuarios" element={<Usuarios />} />
             <Route path="/admin/maestros" element={<Maestros />} />
             <Route path="/admin/alumnos" element={<Alumnos />} />
+            <Route path="/admin/campus" element={<Infraestructura initialCampusId="Todos" />} />
+            <Route path="/admin/salones" element={<Infraestructura initialCampusId="Todos" />} />
             <Route path="/admin/*" element={<ModuloPendiente />} />
           </Route>
         </Route>
